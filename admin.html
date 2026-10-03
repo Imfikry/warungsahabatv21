@@ -84,10 +84,13 @@
           <button onclick="addMenu()" class="bg-blue-600 text-white rounded-xl py-2 font-bold">+ Tambah</button>
         </div>
         <div class="mt-3 flex flex-wrap gap-2 items-center bg-zinc-50 border rounded-xl p-3">
-          <label class="bg-white border rounded-full px-4 py-2 text-sm font-bold cursor-pointer hover:bg-zinc-50">📷 Upload Foto dari HP
-            <input id="mFotoFile" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleFotoUpload(this)">
+          <label class="bg-white border rounded-full px-4 py-2 text-sm font-bold cursor-pointer hover:bg-zinc-50">📷 Ambil Foto
+            <input id="mFotoFileCam" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleFotoUpload(this)">
           </label>
-          <span id="mFotoStatus" class="text-xs text-zinc-500">atau pakai URL di atas — upload akan dikompres otomatis</span>
+          <label class="bg-white border rounded-full px-4 py-2 text-sm font-bold cursor-pointer hover:bg-zinc-50">🖼️ Pilih dari Galeri
+            <input id="mFotoFile" type="file" accept="image/*" class="hidden" onchange="handleFotoUpload(this)">
+          </label>
+          <span id="mFotoStatus" class="text-xs text-zinc-500">akan dikompres otomatis</span>
           <img id="mFotoPreview" class="hidden w-14 h-14 rounded-xl object-cover border">
           <button id="btnClearFoto" onclick="clearFotoUpload()" class="hidden text-xs border bg-white rounded-full px-3 py-1">Hapus</button>
         </div>
@@ -380,10 +383,11 @@ async function handleFotoUpload(input){
 }
 function clearFotoUpload(){
   pendingFoto="";
-  document.getElementById('mFotoFile').value='';
+  const a=document.getElementById('mFotoFile'); if(a) a.value='';
+  const b=document.getElementById('mFotoFileCam'); if(b) b.value='';
   document.getElementById('mFotoPreview').classList.add('hidden');
   document.getElementById('btnClearFoto').classList.add('hidden');
-  document.getElementById('mFotoStatus').textContent='atau pakai URL di atas — upload akan dikompres otomatis';
+  document.getElementById('mFotoStatus').textContent='akan dikompres otomatis';
 }
 function compressImage(file, maxSide, quality){
   return new Promise((resolve,reject)=>{
@@ -428,7 +432,8 @@ function renderMenuAdmin(){
         <div class="text-xs text-zinc-500">${m.kategori} • ${rupiah(m.harga)}</div>
         <div class="flex gap-1 mt-1 flex-wrap">
           <button onclick="editMenu('${m.id}')" class="text-xs border rounded-full px-3 py-1">Edit</button>
-          <label class="text-xs border rounded-full px-3 py-1 cursor-pointer bg-blue-50">📷 Ganti Foto<input type="file" accept="image/*" capture="environment" class="hidden" onchange="handleEditFotoUpload(this, '${m.id}')" ></label>
+          <label class="text-xs border rounded-full px-3 py-1 cursor-pointer bg-blue-50">📷 Kamera<input type="file" accept="image/*" capture="environment" class="hidden" onchange="handleEditFotoUpload(this, '${m.id}')" ></label>
+          <label class="text-xs border rounded-full px-3 py-1 cursor-pointer bg-blue-50">🖼️ Galeri<input type="file" accept="image/*" class="hidden" onchange="handleEditFotoUpload(this, '${m.id}')" ></label>
           <button onclick="delMenu('${m.id}')" class="text-xs border rounded-full px-3 py-1 text-red-600">Hapus</button>
           <button onclick="toggleStok('${m.id}')" class="text-xs border rounded-full px-3 py-1">${m.stok==='habis'?'Set Tersedia':'Set Habis'}</button>
         </div>
