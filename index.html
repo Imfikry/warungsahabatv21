@@ -216,6 +216,12 @@ function downloadNotaLast(){
   const fresh=getOrders().find(o=>o.id===lastOrder.id) || lastOrder;
   downloadNota(fresh, settings);
 }
+function showCancelled(){
+  document.getElementById('statusBox').classList.remove('hidden');
+  document.getElementById('statusId').textContent='';
+  document.getElementById('statusSteps').innerHTML='';
+  document.getElementById('statusInfo').innerHTML='<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-bold">DIBATALKAN</span> Pesanan dibatalkan kasir. Silakan buat pesanan baru.';
+}
 // init
 (function(){
   initSupa();
@@ -227,6 +233,7 @@ function downloadNotaLast(){
   if(lastId){
     const o=getOrders().find(x=>x.id===lastId);
     if(o){ lastOrder=o; showStatus(o); }
+    else { localStorage.removeItem('resto_last_order'); }
   }
   // realtime update status via BC/storage
   onBC(msg=>{
@@ -235,6 +242,7 @@ function downloadNotaLast(){
       if(lastOrder){
         const upd=getOrders().find(x=>x.id===lastOrder.id);
         if(upd){ lastOrder=upd; showStatus(upd); }
+        else { lastOrder=null; localStorage.removeItem('resto_last_order'); showCancelled(); }
       }
     }
     if(msg.type==='menus'){ menus=msg.payload; renderCats(); renderMenu(); }

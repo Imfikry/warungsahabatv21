@@ -342,11 +342,15 @@ function renderOrders(){
         ${o.status==='siap'?'<button onclick="updStatus(\''+o.id+'\',\'lunas\')" class="bg-zinc-900 text-white rounded-xl py-2 text-sm font-bold col-span-3">Tandai Lunas</button>':''}
         ${o.status==='lunas'?'<span class="col-span-3 text-center text-sm bg-zinc-100 rounded-xl py-2">✅ LUNAS</span>':''}
       </div>
-      <button onclick="downloadNotaById('${o.id}')" class="mt-2 w-full border rounded-xl py-2 text-sm">📄 Nota PDF</button>
+      <div class="flex gap-2 mt-2">
+        <button onclick="downloadNotaById('${o.id}')" class="flex-1 border rounded-xl py-2 text-sm">📄 Nota PDF</button>
+        ${o.status!=='lunas'?'<button onclick="cancelOrder(\''+o.id+'\')" class="flex-1 border border-red-300 text-red-600 rounded-xl py-2 text-sm font-bold">Batal</button>':''}
+      </div>
     </div>`;
   }).join('');
 }
 function updStatus(id,next){ const a=getOrders(); const o=a.find(x=>x.id===id); if(!o) return; o.status=next; saveOrders(a); if(hasSupa()) supa.from('orders').update({status:next}).eq('id',id).then(()=>{}); refreshOrders(); renderCatatan(); }
+function cancelOrder(id){ const a=getOrders(); const o=a.find(x=>x.id===id); if(!o) return; if(o.status==='lunas') return alert('Pesanan sudah lunas, tidak bisa dibatalkan.'); if(!confirm('Batalkan pesanan '+id+'? Pesanan akan dihapus permanen.')) return; saveOrders(a.filter(x=>x.id!==id)); if(hasSupa()) supa.from('orders').delete().eq('id',id).then(()=>{}); refreshOrders(); renderCatatan(); }
 function downloadNotaById(id){ const o=getOrders().find(x=>x.id===id); if(o) downloadNota(o,getSettings()); }
 function setToday(){ document.getElementById('inpTanggal').value=todayStr(); renderCatatan(); }
 function renderCatatan(){

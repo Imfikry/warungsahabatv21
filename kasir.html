@@ -171,7 +171,7 @@ function showOrderNotif(order){
       </div>
       <button onclick="this.closest('.notif-card').remove()" class="text-zinc-400 hover:text-zinc-700 text-xl leading-none">×</button>
     </div>
-    <button onclick="this.closest('.notif-card').remove()" class="mt-2 w-full bg-blue-600 text-white rounded-xl py-2 text-sm font-bold">Lihat Pesanan</button>
+    <button onclick="scrollToOrder('${order.id}')" class="mt-2 w-full bg-blue-600 text-white rounded-xl py-2 text-sm font-bold">Lihat Pesanan</button>
   `;
   wrap.appendChild(card);
   // auto hapus 10 detik
@@ -185,6 +185,12 @@ function showOrderNotif(order){
     }catch(e){}
   }
   startTitleBlink('🔔 PESANAN BARU!');
+}
+function scrollToOrder(id){
+  const el=document.getElementById('ord-'+id);
+  if(el){ el.scrollIntoView({behavior:'smooth', block:'center'}); el.classList.add('ring-2','ring-blue-600'); setTimeout(()=>el.classList.remove('ring-2','ring-blue-600'),2000); }
+  else { document.getElementById('ordersGrid')?.scrollIntoView({behavior:'smooth'}); }
+  document.querySelectorAll('.notif-card').forEach(c=>c.remove());
 }
 function ensureNotifPermission(){
   if(window.Notification && Notification.permission==='default'){
@@ -274,7 +280,10 @@ function renderOrders(){
         ${o.status==='lunas'?'<span class="col-span-3 text-center text-sm bg-zinc-100 rounded-xl py-2">✅ LUNAS</span>':''}
         ${o.status==='baru'?'':''}
       </div>
-      <button onclick="downloadNotaById('${o.id}')" class="mt-2 w-full border rounded-xl py-2 text-sm">📄 Nota PDF</button>
+      <div class="flex gap-2 mt-2">
+        <button onclick="downloadNotaById('${o.id}')" class="flex-1 border rounded-xl py-2 text-sm">📄 Nota PDF</button>
+        ${o.status!=='lunas'?'<button onclick="cancelOrder(\''+o.id+'\')" class="flex-1 border border-red-300 text-red-600 rounded-xl py-2 text-sm font-bold">Batal</button>':''}
+      </div>
     </div>`;
   }).join('');
 }
@@ -287,6 +296,16 @@ function updStatus(id, next){
 }
 function downloadNotaById(id){
   const o=getOrders().find(x=>x.id===id); if(!o) return; downloadNota(o, getSettings());
+}
+function cancelOrder(id){
+  const orders=getOrders();
+  const o=orders.find(x=>x.id===id); if(!o) return;
+  if(o.status==='lunas') return alert('Pesanan sudah lunas, tidak bisa dibatalkan.');
+  if(!confirm('Batalkan pesanan '+id+'? Pesanan akan dihapus permanen.')) return;
+  const sisa=orders.filter(x=>x.id!==id);
+  saveOrders(sisa);
+  if(hasSupa()) supa.from('orders').delete().eq('id',id).then(()=>{});
+  refreshOrders(); renderCatatan();
 }
 // Catatan
 function setToday(){ document.getElementById('inpTanggal').value=todayStr(); renderCatatan(); }
