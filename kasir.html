@@ -242,9 +242,8 @@ function refreshOrders(isNew=false){
     const newest=all[0]; notifyOrder(newest);
   }
   _lastCount=all.length;
-  // sort: baru first, then by time desc
-  const orderRank={baru:0,dimasak:1,siap:2,lunas:3};
-  ordersCache=[...all].sort((a,b)=> (orderRank[a.status]-orderRank[b.status]) || (new Date(b.created_at)-new Date(a.created_at)));
+  // urutan tetap: terbaru di atas, status tidak mengubah posisi
+  ordersCache=[...all].sort((a,b)=> (new Date(b.created_at)-new Date(a.created_at)));
   // playTing handled above
   renderOrders();
 }
