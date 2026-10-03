@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin - Warung Sahabat</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+@keyframes slideIn{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.notif-card{animation:slideIn .35s ease}
+*{font-family:'Plus Jakarta Sans',sans-serif}</style>
+</head>
+<body class="bg-[#f6f6f3]">
+<!-- LOGIN -->
+<div id="loginBox" class="min-h-screen grid place-items-center p-4">
+  <div class="bg-white rounded-2xl border p-6 w-full max-w-sm">
+    <div class="font-extrabold text-lg">Login Admin (Owner)</div>
+    <div class="text-sm text-zinc-500">PIN Admin berbeda dengan PIN Kasir</div>
+    <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="PIN Admin" class="mt-3 w-full border rounded-xl px-3 py-3 text-center text-xl tracking-widest">
+    <button onclick="doLogin()" class="mt-3 w-full bg-blue-600 text-white rounded-xl py-3 font-bold">Masuk Admin</button>
+    <div id="pinMsg" class="text-sm text-red-600 mt-2 hidden"></div>
+  </div>
+</div>
+
+<div id="appBox" class="hidden">
+  <header class="sticky top-0 z-20 bg-white border-b">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="font-extrabold" id="hdrNama">Warung Sahabat — Admin</div>
+      <div class="flex gap-2">
+        <a href="kasir.html" class="border rounded-full px-3 py-1 text-sm">Buka Kasir</a>
+        <button onclick="logout()" class="border rounded-full px-3 py-1 text-sm">Logout</button>
+      </div>
+    </div>
+  </header>
+  <div id="notifContainer" class="fixed top-3 inset-x-3 z-50 flex flex-col gap-2 pointer-events-none max-w-lg mx-auto"></div>
+
+  <div class="max-w-6xl mx-auto px-4 mt-4">
+    <!-- TABS -->
+    <div class="flex gap-2 overflow-auto pb-2">
+      <button onclick="tab('pesanan')" id="tab-pesanan" class="px-4 py-2 rounded-full bg-zinc-900 text-white text-sm font-bold">Pesanan (Kasir)</button>
+      <button onclick="tab('menu')" id="tab-menu" class="px-4 py-2 rounded-full bg-white border text-sm font-bold">Menu</button>
+      <button onclick="tab('stok')" id="tab-stok" class="px-4 py-2 rounded-full bg-white border text-sm font-bold">Stok</button>
+      <button onclick="tab('pengaturan')" id="tab-pengaturan" class="px-4 py-2 rounded-full bg-white border text-sm font-bold">Pengaturan</button>
+      <button onclick="tab('laporan')" id="tab-laporan" class="px-4 py-2 rounded-full bg-white border text-sm font-bold">Laporan</button>
+      <button onclick="tab('qr')" id="tab-qr" class="px-4 py-2 rounded-full bg-white border text-sm font-bold">QR Universal</button>
+    </div>
+
+    <!-- TAB: PESANAN (same as kasir) -->
+    <div id="pane-pesanan" class="">
+      <div class="bg-white rounded-2xl border p-3 flex flex-wrap gap-2 items-center">
+        <select id="fTipe" onchange="renderOrders()" class="border rounded-full px-3 py-1.5 text-sm"><option value="semua">Semua</option><option value="dinein">Dine In</option><option value="takeaway">Takeaway</option></select>
+        <select id="fStatus" onchange="renderOrders()" class="border rounded-full px-3 py-1.5 text-sm"><option value="semua">Semua Status</option><option value="baru">Baru</option><option value="dimasak">Dimasak</option><option value="siap">Siap</option><option value="lunas">Lunas</option></select>
+        <span id="countInfo" class="text-sm text-zinc-500 ml-auto"></span>
+      </div>
+      <div id="ordersGrid" class="grid md:grid-cols-2 gap-3 mt-3"></div>
+      <!-- Catatan harian -->
+      <div class="bg-white rounded-2xl border p-4 mt-4">
+        <div class="flex gap-2 items-center justify-between"><div class="font-bold">📒 Catatan Per Hari</div><div class="flex gap-2"><input id="inpTanggal" type="date" class="border rounded-xl px-3 py-2 text-sm"><button onclick="setToday()" class="border rounded-xl px-3 py-2 text-sm">Hari ini</button></div></div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+          <div class="bg-zinc-900 text-white rounded-2xl p-4"><div class="text-xs opacity-70">Omzet (Lunas)</div><div id="statOmzet" class="font-extrabold">Rp 0</div></div>
+          <div class="bg-white border rounded-2xl p-4"><div class="text-xs text-zinc-500">Jumlah</div><div id="statJumlah" class="font-extrabold">0</div></div>
+          <div class="bg-white border rounded-2xl p-4"><div class="text-xs text-zinc-500">Rata / Nota</div><div id="statRata" class="font-extrabold">Rp 0</div></div>
+          <div class="bg-white border rounded-2xl p-4"><div class="text-xs text-zinc-500">Dine In / Takeaway</div><div id="statPecah" class="font-bold text-sm">0 / 0</div></div>
+        </div>
+        <div class="flex gap-2 mt-3"><button onclick="exportExcelHarian()" class="bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm font-bold">Export Excel</button><button onclick="exportPDFHarian()" class="bg-zinc-900 text-white rounded-xl px-4 py-2 text-sm font-bold">Export PDF</button></div>
+      </div>
+    </div>
+
+    <!-- TAB: MENU -->
+    <div id="pane-menu" class="hidden">
+      <div class="bg-white rounded-2xl border p-4">
+        <div class="font-bold">Kelola Menu</div>
+        <div class="grid md:grid-cols-5 gap-2 mt-3">
+          <input id="mNama" placeholder="Nama menu" class="border rounded-xl px-3 py-2">
+          <input id="mHarga" type="number" placeholder="Harga" class="border rounded-xl px-3 py-2">
+          <select id="mKategori" class="border rounded-xl px-3 py-2 bg-white"><option value="Makanan">Makanan</option><option value="Minuman">Minuman</option><option value="Snack">Snack</option><option value="Lainnya">Lainnya</option></select>
+          <input id="mFoto" placeholder="URL Foto (opsional jika upload)" class="border rounded-xl px-3 py-2">
+          <button onclick="addMenu()" class="bg-blue-600 text-white rounded-xl py-2 font-bold">+ Tambah</button>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2 items-center bg-zinc-50 border rounded-xl p-3">
+          <label class="bg-white border rounded-full px-4 py-2 text-sm font-bold cursor-pointer hover:bg-zinc-50">📷 Upload Foto dari HP
+            <input id="mFotoFile" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleFotoUpload(this)">
+          </label>
+          <span id="mFotoStatus" class="text-xs text-zinc-500">atau pakai URL di atas — upload akan dikompres otomatis</span>
+          <img id="mFotoPreview" class="hidden w-14 h-14 rounded-xl object-cover border">
+          <button id="btnClearFoto" onclick="clearFotoUpload()" class="hidden text-xs border bg-white rounded-full px-3 py-1">Hapus</button>
+        </div>
+        <div id="menuList" class="grid md:grid-cols-2 gap-3 mt-4"></div>
+      </div>
+    </div>
+
+    <!-- TAB: STOK -->
+    <div id="pane-stok" class="hidden">
+      <div class="bg-white rounded-2xl border p-4">
+        <div class="font-bold">Kelola Stok</div>
+        <div class="text-sm text-zinc-500">Tandai Habis — pembeli tidak bisa pesan menu tersebut</div>
+        <div id="stokList" class="space-y-2 mt-3"></div>
+      </div>
+    </div>
+
+    <!-- TAB: PENGATURAN -->
+    <div id="pane-pengaturan" class="hidden space-y-3">
+      <div class="bg-white rounded-2xl border p-4">
+        <div class="font-bold">Pengaturan Resto</div>
+        <div class="grid md:grid-cols-2 gap-3 mt-3">
+          <label class="text-sm">Nama Resto<input id="sNama" class="mt-1 w-full border rounded-xl px-3 py-2"></label>
+          <label class="text-sm">Jumlah Meja<input id="sMeja" type="number" class="mt-1 w-full border rounded-xl px-3 py-2"></label>
+          <label class="text-sm md:col-span-2">Alamat di Nota<input id="sAlamat" class="mt-1 w-full border rounded-xl px-3 py-2"></label>
+          <label class="text-sm hidden">Pajak %<input id="sPajak" type="number" class="mt-1 w-full border rounded-xl px-3 py-2"></label>
+          <div class="flex items-end"><button onclick="savePengaturan()" class="w-full bg-zinc-900 text-white rounded-xl py-2.5 font-bold">Simpan Pengaturan</button></div>
+        </div>
+      </div>
+      <div class="bg-white rounded-2xl border p-4">
+        <div class="font-bold">Ganti PIN</div>
+        <div class="grid md:grid-cols-3 gap-3 mt-3">
+          <label class="text-sm">PIN Kasir Baru<input id="sPinKasir" type="password" maxlength="6" class="mt-1 w-full border rounded-xl px-3 py-2"></label>
+          <label class="text-sm">PIN Admin Baru<input id="sPinAdmin" type="password" maxlength="6" class="mt-1 w-full border rounded-xl px-3 py-2"></label>
+          <div class="flex items-end"><button onclick="savePIN()" class="w-full bg-blue-600 text-white rounded-xl py-2.5 font-bold">Simpan PIN</button></div>
+        </div>
+        <div class="text-xs text-zinc-500 mt-2">PIN berbeda, Kasir & Admin tidak boleh sama.</div>
+      </div>
+    </div>
+
+    <!-- TAB: LAPORAN -->
+    <div id="pane-laporan" class="hidden">
+      <div class="bg-white rounded-2xl border p-4">
+        <div class="font-bold">Laporan Lengkap</div>
+        <div class="flex flex-wrap gap-2 mt-3">
+          <input id="lapDari" type="date" class="border rounded-xl px-3 py-2 text-sm">
+          <span class="py-2 text-sm">s/d</span>
+          <input id="lapSampai" type="date" class="border rounded-xl px-3 py-2 text-sm">
+          <button onclick="renderLaporan()" class="bg-zinc-900 text-white rounded-xl px-4 py-2 text-sm font-bold">Tampilkan</button>
+          <button onclick="lapToday()" class="border rounded-xl px-4 py-2 text-sm">Hari ini</button>
+          <button onclick="lapBulan()" class="border rounded-xl px-4 py-2 text-sm">Bulan ini</button>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+          <div class="bg-zinc-900 text-white rounded-2xl p-4"><div class="text-xs opacity-70">Omzet (Lunas)</div><div id="lapOmzet" class="font-extrabold">Rp 0</div></div>
+          <div class="border rounded-2xl p-4"><div class="text-xs text-zinc-500">Pesanan</div><div id="lapJumlah" class="font-extrabold">0</div></div>
+          <div class="border rounded-2xl p-4"><div class="text-xs text-zinc-500">Rata / Nota</div><div id="lapRata" class="font-extrabold">Rp 0</div></div>
+          <div class="border rounded-2xl p-4"><div class="text-xs text-zinc-500">Periode</div><div id="lapPeriode" class="text-sm font-bold">-</div></div>
+        </div>
+        <div class="flex gap-2 mt-3"><button onclick="exportLapExcel()" class="bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm font-bold">Export Excel</button><button onclick="exportLapPDF()" class="bg-zinc-900 text-white rounded-xl px-4 py-2 text-sm font-bold">Export PDF</button><button onclick="window.print()" class="border rounded-xl px-4 py-2 text-sm">Cetak</button></div>
+        <div id="lapDetail" class="mt-4 text-sm"></div>
+      </div>
+    </div>
+
+    <!-- TAB: QR -->
+    <div id="pane-qr" class="hidden">
+      <div class="bg-white rounded-2xl border p-6 text-center">
+        <div class="font-bold">1 QR Universal — Tempel 1x di Pintu/Kasir</div>
+        <div class="text-sm text-zinc-500">Semua meja scan QR yang sama: <span id="qrUrl" class="font-mono"></span></div>
+        <div id="qrcode" class="flex justify-center mt-4"></div>
+        <div class="flex gap-2 justify-center mt-4">
+          <button onclick="printQR()" class="bg-zinc-900 text-white rounded-xl px-6 py-2.5 font-bold">🖨️ Print QR</button>
+          <button onclick="downloadQR()" class="border rounded-xl px-6 py-2.5 font-bold">Download PNG</button>
+        </div>
+        <div class="text-xs text-zinc-400 mt-2">Link: namaresto.vercel.app — pembeli pilih Dine In/Takeaway & nomor meja manual</div>
+      </div>
+    </div>
+
+  </div>
+  <div class="h-10"></div>
+</div>
+
+<audio id="ting" src="https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3?filename=notification-sound-7062.mp3" preload="auto"></audio>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+let failCount=0, lockUntil=0;
+let ordersCache=[];
+let lapCache=[];
+
+function playTing(){
+  try{
+    const a=document.getElementById('ting');
+    if(a){ a.currentTime=0; a.play().catch(()=>{}); }
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const beep=(freq,dur,delay)=>{
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.frequency.value=freq; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.5, ctx.currentTime+delay);
+      g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+delay+dur);
+      o.start(ctx.currentTime+delay); o.stop(ctx.currentTime+delay+dur);
+    };
+    beep(880,0.18,0); beep(1320,0.18,0.22); beep(1760,0.35,0.44);
+  }catch(e){}
+  if(navigator.vibrate) navigator.vibrate([300,100,300,100,400]);
+}
+let titleBlinkTimer=null, origTitle=document.title;
+function startTitleBlink(text){
+  if(titleBlinkTimer) clearInterval(titleBlinkTimer);
+  let on=true;
+  titleBlinkTimer=setInterval(()=>{ document.title = on ? text : origTitle; on=!on; }, 700);
+  setTimeout(()=>{ clearInterval(titleBlinkTimer); document.title=origTitle; titleBlinkTimer=null; }, 10000);
+}
+function showOrderNotif(order){
+  const wrap=document.getElementById('notifContainer');
+  if(!wrap) return;
+  const card=document.createElement('div');
+  const badge = order.tipe==='dinein' ? '🍽️ DINE IN • Meja '+order.meja : '🥡 TAKEAWAY • '+order.nama;
+  const itemsText = order.items.map(i=> i.nama+' x'+i.qty).join(', ');
+  card.className='notif-card bg-white border-2 border-blue-600 rounded-2xl shadow-2xl p-4 pointer-events-auto';
+  card.innerHTML = `
+    <div class="flex items-start justify-between gap-3">
+      <div class="flex-1">
+        <div class="text-xs font-bold text-blue-600 tracking-wide">🔔 PESANAN BARU!</div>
+        <div class="font-extrabold text-zinc-900">${badge}</div>
+        <div class="text-xs text-zinc-500">${fmtDate(order.created_at)} • ${order.id}</div>
+        <div class="text-sm text-zinc-700 mt-1 line-clamp-2">${itemsText}</div>
+        <div class="font-extrabold text-blue-600 mt-1">${rupiah(order.total)}</div>
+      </div>
+      <button onclick="this.closest('.notif-card').remove()" class="text-zinc-400 hover:text-zinc-700 text-xl leading-none">×</button>
+    </div>
+    <button onclick="this.closest('.notif-card').remove()" class="mt-2 w-full bg-blue-600 text-white rounded-xl py-2 text-sm font-bold">Lihat Pesanan</button>
+  `;
+  wrap.appendChild(card);
+  setTimeout(()=>{ card.style.transition='opacity .4s'; card.style.opacity='0'; setTimeout(()=>card.remove(),400); }, 10000);
+  if(window.Notification && Notification.permission==='granted'){
+    try{
+      const n=new Notification('🔔 Pesanan Baru - '+badge, {body: itemsText+' • '+rupiah(order.total)});
+      n.onclick=()=>{ window.focus(); n.close(); };
+      setTimeout(()=>n.close(),8000);
+    }catch(e){}
+  }
+  startTitleBlink('🔔 PESANAN BARU!');
+}
+function ensureNotifPermission(){
+  if(window.Notification && Notification.permission==='default'){
+    Notification.requestPermission().then(()=>{});
+  }
+}
+
+
+function doLogin(){
+  const now=Date.now();
+  if(now<lockUntil){ document.getElementById('pinMsg').classList.remove('hidden'); document.getElementById('pinMsg').textContent='Terkunci '+Math.ceil((lockUntil-now)/1000)+' detik'; return; }
+  const pin=document.getElementById('pinInput').value.trim();
+  const s=getSettings();
+  if(pin===s.pinAdmin){
+    localStorage.setItem('admin_login','1');
+    document.getElementById('loginBox').classList.add('hidden');
+    document.getElementById('appBox').classList.remove('hidden');
+    initAdmin();
+  } else {
+    failCount++; if(failCount>=3){lockUntil=Date.now()+60000; document.getElementById('pinMsg').classList.remove('hidden'); document.getElementById('pinMsg').textContent='PIN salah 3x, terkunci 60 detik';} else {document.getElementById('pinMsg').classList.remove('hidden'); document.getElementById('pinMsg').textContent='PIN salah ('+failCount+'/3)';}
+  }
+}
+function logout(){ localStorage.removeItem('admin_login'); location.reload(); }
+function tab(name){
+  ['pesanan','menu','stok','pengaturan','laporan','qr'].forEach(t=>{
+    document.getElementById('pane-'+t).classList.toggle('hidden', t!==name);
+    document.getElementById('tab-'+t).className = t===name ? 'px-4 py-2 rounded-full bg-zinc-900 text-white text-sm font-bold' : 'px-4 py-2 rounded-full bg-white border text-sm font-bold';
+  });
+  if(name==='qr') genQR();
+  if(name==='menu') renderMenuAdmin();
+  if(name==='stok') renderStok();
+  if(name==='pengaturan') loadPengaturan();
+  if(name==='laporan') renderLaporan();
+}
+
+async function initAdmin(){
+  ensureNotifPermission();
+  initSupa();
+  if(hasSupa()){ await syncSettingsFromSupa(); await syncOrdersFromSupa(); await syncMenusFromSupa(); }
+  document.getElementById('hdrNama').textContent=getSettings().nama+' — Admin';
+  document.getElementById('inpTanggal').value=todayStr();
+  const now=new Date(); document.getElementById('lapDari').value=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);
+  document.getElementById('lapSampai').value=todayStr();
+  refreshOrders(); renderCatatan(); renderMenuAdmin(); renderStok(); loadPengaturan();
+  onBC(msg=>{
+    if(msg.type==='orders'){ refreshOrders(); renderCatatan(); }
+    if(msg.type==='menus'){ renderMenuAdmin(); renderStok(); }
+    if(msg.type==='settings'){ document.getElementById('hdrNama').textContent=msg.payload.nama+' — Admin'; loadPengaturan(); }
+  });
+  if(hasSupa()){
+    supa.channel('orders-admin').on('postgres_changes',{event:'INSERT',schema:'public',table:'orders'}, payload=>{
+      const ord=payload.new; if(ord){
+        try{
+          const mapped={id:ord.id,tipe:ord.tipe,meja:ord.meja,nama:ord.nama,wa:ord.wa,jamAmbil:ord.jam_ambil,catatan:ord.catatan,items:typeof ord.items==='string'?JSON.parse(ord.items):ord.items,subtotal:ord.subtotal,pajak:ord.pajak,total:ord.total,status:ord.status,created_at:ord.created_at};
+          const all=getOrders(); if(!all.find(x=>x.id===mapped.id)){ all.unshift(mapped); localStorage.setItem(LS_ORDERS, JSON.stringify(all)); }
+          showOrderNotif(mapped); playTing();
+        }catch(e){}
+      }
+      refreshOrders(); renderCatatan();
+    }).on('postgres_changes',{event:'UPDATE',schema:'public',table:'orders'}, payload=>{
+      try{ const ord=payload.new; if(ord){ const all=getOrders(); const idx=all.findIndex(x=>x.id===ord.id); if(idx>=0){ all[idx].status=ord.status; localStorage.setItem(LS_ORDERS, JSON.stringify(all)); } } }catch(e){}
+      refreshOrders(); renderCatatan();
+    }).subscribe();
+  }
+  setInterval(async ()=>{ if(hasSupa()){ await syncSettingsFromSupa(); await syncOrdersFromSupa(); } refreshOrders(); renderCatatan(); }, 4000);
+  genQR();
+}
+
+// === Pesanan (same as kasir) ===
+var _lastCountA = 0;
+function refreshOrders(){
+  const all=getOrders();
+  if(all.length > _lastCountA && _lastCountA!==0){
+    const newest=all[0]; if(typeof playTing==='function') playTing(); if(typeof showOrderNotif==='function') showOrderNotif(newest);
+  }
+  _lastCountA=all.length;
+  const rank={baru:0,dimasak:1,siap:2,lunas:3};
+  ordersCache=[...all].sort((a,b)=> (rank[a.status]-rank[b.status]) || (new Date(b.created_at)-new Date(a.created_at)));
+  renderOrders();
+}
+function renderOrders(){
+  const t=document.getElementById('fTipe').value, s=document.getElementById('fStatus').value;
+  const list=ordersCache.filter(o=> (t==='semua'||o.tipe===t)&&(s==='semua'||o.status===s));
+  document.getElementById('countInfo').textContent=list.length+' pesanan';
+  const grid=document.getElementById('ordersGrid');
+  if(!list.length){ grid.innerHTML='<div class="text-sm text-zinc-500 bg-white border rounded-2xl p-6 text-center">Belum ada pesanan</div>'; return; }
+  grid.innerHTML=list.map(o=>{
+    const badge=o.tipe==='dinein'?'<span class="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">🍽️ DINE IN</span>':'<span class="bg-orange-500 text-white text-xs px-2 py-1 rounded-full">🥡 TAKEAWAY</span>';
+    const stColor={baru:'bg-blue-600',dimasak:'bg-blue-600',siap:'bg-emerald-600',lunas:'bg-zinc-900'}[o.status];
+    const info=o.tipe==='dinein'?('Meja '+o.meja + (o.nama ? ' - '+o.nama : '')):o.nama;
+    return `<div class="bg-white rounded-2xl border p-4">
+      <div class="flex justify-between items-center"><div class="flex gap-2">${badge}<span class="text-xs ${stColor} text-white px-2 py-1 rounded-full">${o.status.toUpperCase()}</span></div><div class="text-xs text-zinc-500">${fmtDate(o.created_at)}</div></div>
+      <div class="font-bold mt-2">${o.id}</div><div class="text-sm text-zinc-600">${info}</div>
+      ${o.catatan?'<div class="text-xs bg-blue-50 border border-blue-200 rounded-lg px-2 py-1 mt-1">Catatan: '+o.catatan+'</div>':''}
+      <div class="mt-2 text-sm space-y-1">${o.items.map(i=>'<div class="flex justify-between"><span>'+i.nama+' x'+i.qty+'</span><span>'+rupiah(i.harga*i.qty)+'</span></div>').join('')}</div>
+      <div class="flex justify-between font-extrabold border-t mt-2 pt-2"><span>Total</span><span>${rupiah(o.total)}</span></div>
+      <div class="grid grid-cols-3 gap-2 mt-3">
+        ${o.status==='baru'?'<button onclick="updStatus(\''+o.id+'\',\'dimasak\')" class="bg-blue-600 text-white rounded-xl py-2 text-sm font-bold">Dimasak</button>':''}
+        ${o.status==='dimasak'?'<button onclick="updStatus(\''+o.id+'\',\'siap\')" class="bg-emerald-600 text-white rounded-xl py-2 text-sm font-bold">Tandai Siap</button>':''}
+        ${o.status==='siap'?'<button onclick="updStatus(\''+o.id+'\',\'lunas\')" class="bg-zinc-900 text-white rounded-xl py-2 text-sm font-bold col-span-3">Tandai Lunas</button>':''}
+        ${o.status==='lunas'?'<span class="col-span-3 text-center text-sm bg-zinc-100 rounded-xl py-2">✅ LUNAS</span>':''}
+      </div>
+      <button onclick="downloadNotaById('${o.id}')" class="mt-2 w-full border rounded-xl py-2 text-sm">📄 Nota PDF</button>
+    </div>`;
+  }).join('');
+}
+function updStatus(id,next){ const a=getOrders(); const o=a.find(x=>x.id===id); if(!o) return; o.status=next; saveOrders(a); if(hasSupa()) supa.from('orders').update({status:next}).eq('id',id).then(()=>{}); refreshOrders(); renderCatatan(); }
+function downloadNotaById(id){ const o=getOrders().find(x=>x.id===id); if(o) downloadNota(o,getSettings()); }
+function setToday(){ document.getElementById('inpTanggal').value=todayStr(); renderCatatan(); }
+function renderCatatan(){
+  const tgl=document.getElementById('inpTanggal')?.value||todayStr();
+  const all=getOrders(); const day=all.filter(o=>o.created_at.slice(0,10)===tgl);
+  const lunas=day.filter(o=>o.status==='lunas'); const omzet=lunas.reduce((a,b)=>a+b.total,0);
+  const rata=lunas.length?Math.round(omzet/lunas.length):0;
+  document.getElementById('statOmzet').textContent=rupiah(omzet);
+  document.getElementById('statJumlah').textContent=day.length+' ('+lunas.length+' lunas)';
+  document.getElementById('statRata').textContent=rupiah(rata);
+  document.getElementById('statPecah').textContent=day.filter(o=>o.tipe==='dinein').length+' Dine In / '+day.filter(o=>o.tipe==='takeaway').length+' Takeaway';
+}
+function exportExcelHarian(){ const tgl=document.getElementById('inpTanggal').value||todayStr(); const rows=getOrders().filter(o=>o.created_at.slice(0,10)===tgl); if(!rows.length) return alert('Tidak ada data'); exportOrdersExcel(rows,getSettings(),'Rekap_'+tgl+'.xlsx'); }
+function exportPDFHarian(){ const tgl=document.getElementById('inpTanggal').value||todayStr(); const rows=getOrders().filter(o=>o.created_at.slice(0,10)===tgl); if(!rows.length) return alert('Tidak ada data'); exportOrdersPDF(rows,getSettings(),'Rekap Harian '+tgl); }
+
+// === Menu ===
+let pendingFoto = "";
+async function handleFotoUpload(input){
+  const file=input.files && input.files[0];
+  if(!file) return;
+  if(file.size > 8*1024*1024) return alert('Foto terlalu besar, maksimal 8MB');
+  document.getElementById('mFotoStatus').textContent='Memproses...';
+  try{
+    const dataUrl=await compressImage(file, 700, 0.72);
+    pendingFoto=dataUrl;
+    const prev=document.getElementById('mFotoPreview');
+    prev.src=dataUrl; prev.classList.remove('hidden');
+    document.getElementById('btnClearFoto').classList.remove('hidden');
+    document.getElementById('mFotoStatus').textContent='Siap ✓ ('+Math.round(dataUrl.length/1024)+' KB)';
+  }catch(e){
+    alert('Gagal proses foto: '+e.message);
+    document.getElementById('mFotoStatus').textContent='Gagal';
+  }
+}
+function clearFotoUpload(){
+  pendingFoto="";
+  document.getElementById('mFotoFile').value='';
+  document.getElementById('mFotoPreview').classList.add('hidden');
+  document.getElementById('btnClearFoto').classList.add('hidden');
+  document.getElementById('mFotoStatus').textContent='atau pakai URL di atas — upload akan dikompres otomatis';
+}
+function compressImage(file, maxSide, quality){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        let w=img.width, h=img.height;
+        const scale=Math.min(1, maxSide/Math.max(w,h));
+        w=Math.round(w*scale); h=Math.round(h*scale);
+        const canvas=document.createElement('canvas');
+        canvas.width=w; canvas.height=h;
+        const ctx=canvas.getContext('2d');
+        ctx.drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror=()=>reject(new Error('format foto tidak didukung'));
+      img.src=reader.result;
+    };
+    reader.onerror=()=>reject(new Error('gagal baca file'));
+    reader.readAsDataURL(file);
+  });
+}
+async function handleEditFotoUpload(input, id){
+  const file=input.files && input.files[0];
+  if(!file) return;
+  const dataUrl=await compressImage(file, 700, 0.72);
+  const menus=getMenus(); const m=menus.find(x=>x.id===id); if(!m) return;
+  m.foto=dataUrl;
+  saveMenus(menus);
+  if(hasSupa()) supa.from('menus').update({foto:dataUrl}).eq('id',id).then(()=>{});
+  renderMenuAdmin(); renderStok();
+}
+function renderMenuAdmin(){
+  const menus=getMenus();
+  const el=document.getElementById('menuList');
+  el.innerHTML=menus.map(m=> `
+    <div class="border rounded-2xl overflow-hidden bg-white flex gap-3 p-3">
+      <img src="${m.foto}" class="w-16 h-16 rounded-xl object-cover">
+      <div class="flex-1">
+        <div class="font-bold text-sm">${m.nama} ${m.stok==='habis'?'<span class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">HABIS</span>':''}</div>
+        <div class="text-xs text-zinc-500">${m.kategori} • ${rupiah(m.harga)}</div>
+        <div class="flex gap-1 mt-1 flex-wrap">
+          <button onclick="editMenu('${m.id}')" class="text-xs border rounded-full px-3 py-1">Edit</button>
+          <label class="text-xs border rounded-full px-3 py-1 cursor-pointer bg-blue-50">📷 Ganti Foto<input type="file" accept="image/*" capture="environment" class="hidden" onchange="handleEditFotoUpload(this, '${m.id}')" ></label>
+          <button onclick="delMenu('${m.id}')" class="text-xs border rounded-full px-3 py-1 text-red-600">Hapus</button>
+          <button onclick="toggleStok('${m.id}')" class="text-xs border rounded-full px-3 py-1">${m.stok==='habis'?'Set Tersedia':'Set Habis'}</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+function addMenu(){
+  const nama=document.getElementById('mNama').value.trim();
+  const harga=Number(document.getElementById('mHarga').value);
+  const kategori=document.getElementById('mKategori').value.trim()||'Lainnya';
+  let foto=pendingFoto || document.getElementById('mFoto').value.trim() || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400';
+  if(!nama||!harga) return alert('Nama & harga wajib diisi');
+  const menus=getMenus(); menus.push({id:'m'+Date.now(), nama, harga, kategori, foto, stok:'tersedia'}); saveMenus(menus);
+  if(hasSupa()) supa.from('menus').insert([{id:menus[menus.length-1].id, nama, harga, kategori, foto, stok:'tersedia'}]).then(()=>{});
+  document.getElementById('mNama').value=''; document.getElementById('mHarga').value=''; document.getElementById('mKategori').value='Makanan'; document.getElementById('mFoto').value='';
+  clearFotoUpload();
+  renderMenuAdmin(); renderStok();
+}
+function editMenu(id){
+  const menus=getMenus(); const m=menus.find(x=>x.id===id); if(!m) return;
+  const nama=prompt('Nama menu', m.nama); if(nama===null) return;
+  const harga=prompt('Harga', m.harga); if(harga===null) return;
+  const kategori=prompt('Kategori', m.kategori); if(kategori===null) return;
+  const foto=prompt('URL Foto', m.foto); if(foto===null) return;
+  m.nama=nama.trim()||m.nama; m.harga=Number(harga)||m.harga; m.kategori=kategori.trim()||m.kategori; m.foto=foto.trim()||m.foto;
+  saveMenus(menus); if(hasSupa()) supa.from('menus').update({nama:m.nama,harga:m.harga,kategori:m.kategori,foto:m.foto}).eq('id',id).then(()=>{}); renderMenuAdmin(); renderStok();
+}
+function delMenu(id){ if(!confirm('Hapus menu ini?')) return; let menus=getMenus().filter(x=>x.id!==id); saveMenus(menus); if(hasSupa()) supa.from('menus').delete().eq('id',id).then(()=>{}); renderMenuAdmin(); renderStok(); }
+function toggleStok(id){ const menus=getMenus(); const m=menus.find(x=>x.id===id); if(!m) return; m.stok=m.stok==='habis'?'tersedia':'habis'; saveMenus(menus); if(hasSupa()) supa.from('menus').update({stok:m.stok}).eq('id',id).then(()=>{}); renderMenuAdmin(); renderStok(); }
+
+function renderStok(){
+  const menus=getMenus();
+  document.getElementById('stokList').innerHTML=menus.map(m=> `
+    <div class="flex items-center justify-between border rounded-xl px-3 py-2 bg-white">
+      <div><div class="font-bold text-sm">${m.nama}</div><div class="text-xs text-zinc-500">${m.kategori} • ${rupiah(m.harga)} • <span class="${m.stok==='habis'?'text-red-600 font-bold':'text-emerald-600'}">${m.stok}</span></div></div>
+      <button onclick="toggleStok('${m.id}')" class="px-4 py-1.5 rounded-full text-sm font-bold ${m.stok==='habis'?'bg-emerald-600 text-white':'bg-red-600 text-white'}">${m.stok==='habis'?'Tersedia':'Habis'}</button>
+    </div>
+  `).join('');
+}
+
+// === Pengaturan ===
+function loadPengaturan(){
+  const s=getSettings();
+  document.getElementById('sNama').value=s.nama;
+  document.getElementById('sAlamat').value=s.alamat;
+  document.getElementById('sMeja').value=s.jumlahMeja;
+  document.getElementById('sPajak').value=s.pajak;
+  document.getElementById('sPinKasir').value='';
+  document.getElementById('sPinAdmin').value='';
+}
+function savePengaturan(){
+  const s=getSettings();
+  s.nama=document.getElementById('sNama').value.trim()||s.nama;
+  s.alamat=document.getElementById('sAlamat').value.trim()||s.alamat;
+  s.jumlahMeja=Math.max(1, Number(document.getElementById('sMeja').value)||s.jumlahMeja);
+  s.pajak=Number(document.getElementById('sPajak').value);
+  if(s.pajak<0) s.pajak=0; if(s.pajak>100) s.pajak=100;
+  saveSettings(s); document.getElementById('hdrNama').textContent=s.nama+' — Admin'; alert('Pengaturan disimpan'); genQR();
+}
+function savePIN(){
+  const s=getSettings();
+  const pK=document.getElementById('sPinKasir').value.trim();
+  const pA=document.getElementById('sPinAdmin').value.trim();
+  if(pK){ if(pK.length<4) return alert('PIN Kasir minimal 4 digit'); s.pinKasir=pK; }
+  if(pA){ if(pA.length<4) return alert('PIN Admin minimal 4 digit'); s.pinAdmin=pA; }
+  if(pK&&pA&&pK===pA) return alert('PIN Kasir & Admin tidak boleh sama');
+  if(!pK&&!pA) return alert('Isi salah satu PIN dulu');
+  saveSettings(s); alert('PIN disimpan'); loadPengaturan();
+}
+
+// === Laporan ===
+function lapToday(){ const t=todayStr(); document.getElementById('lapDari').value=t; document.getElementById('lapSampai').value=t; renderLaporan(); }
+function lapBulan(){ const now=new Date(); document.getElementById('lapDari').value=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10); document.getElementById('lapSampai').value=todayStr(); renderLaporan(); }
+function renderLaporan(){
+  const dari=document.getElementById('lapDari').value, sampai=document.getElementById('lapSampai').value;
+  const all=getOrders();
+  const filtered=all.filter(o=>{ const d=o.created_at.slice(0,10); return d>=dari && d<=sampai; });
+  lapCache=filtered;
+  const lunas=filtered.filter(o=>o.status==='lunas');
+  const omzet=lunas.reduce((a,b)=>a+b.total,0);
+  const rata=lunas.length?Math.round(omzet/lunas.length):0;
+  document.getElementById('lapOmzet').textContent=rupiah(omzet);
+  document.getElementById('lapJumlah').textContent=filtered.length+' ('+lunas.length+' lunas)';
+  document.getElementById('lapRata').textContent=rupiah(rata);
+  document.getElementById('lapPeriode').textContent=dari+' s/d '+sampai;
+  document.getElementById('lapDetail').innerHTML= filtered.length? '<div class="border rounded-xl overflow-auto"><table class="w-full text-xs"><thead class="bg-zinc-100"><tr><th class="p-2 text-left">ID</th><th class="p-2">Tipe</th><th class="p-2">Info</th><th class="p-2">Total</th><th class="p-2">Status</th></tr></thead><tbody>'+filtered.slice(0,100).map(o=>'<tr class="border-t"><td class="p-2 font-mono">'+o.id+'</td><td class="p-2">'+o.tipe+'</td><td class="p-2">'+(o.tipe==='dinein'?'Meja '+o.meja:o.nama)+'</td><td class="p-2">'+rupiah(o.total)+'</td><td class="p-2">'+o.status+'</td></tr>').join('')+'</tbody></table></div>' : '<div class="text-zinc-500">Tidak ada data di periode ini</div>';
+}
+function exportLapExcel(){ if(!lapCache.length) return alert('Tidak ada data'); exportOrdersExcel(lapCache,getSettings(),'Laporan_'+document.getElementById('lapDari').value+'_sd_'+document.getElementById('lapSampai').value+'.xlsx'); }
+function exportLapPDF(){ if(!lapCache.length) return alert('Tidak ada data'); exportOrdersPDF(lapCache,getSettings(),'Laporan '+document.getElementById('lapDari').value+' s/d '+document.getElementById('lapSampai').value); }
+
+// === QR ===
+function genQR(){
+  const url=location.origin + location.pathname.replace('admin.html','');
+  document.getElementById('qrUrl').textContent=url;
+  const el=document.getElementById('qrcode'); el.innerHTML='';
+  new QRCode(el, {text: url, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.H});
+  // label bawah
+  setTimeout(()=>{
+    const cap=document.createElement('div'); cap.className='text-xs font-bold mt-2'; cap.textContent=getSettings().nama + ' • Scan untuk Pesan';
+    el.appendChild(cap);
+  }, 300);
+}
+function printQR(){ const w=window.open('','_blank'); const qr=document.getElementById('qrcode').innerHTML; w.document.write('<html><head><title>QR '+getSettings().nama+'</title></head><body style="text-align:center;padding:40px;font-family:sans-serif"><h2>'+getSettings().nama+'</h2><p>Scan QR ini untuk pesan</p><div style="display:flex;justify-content:center">'+qr+'</div><p style="font-size:12px">'+location.origin+location.pathname.replace('admin.html','')+'</p><script>window.print()<\/script></body></html>'); w.document.close(); }
+function downloadQR(){
+  const canvas=document.querySelector('#qrcode canvas'); if(!canvas) return alert('QR belum siap');
+  const a=document.createElement('a'); a.download='QR-'+getSettings().nama.replace(/\s+/g,'_')+'.png'; a.href=canvas.toDataURL('image/png'); a.click();
+}
+
+(function(){ if(localStorage.getItem('admin_login')==='1'){ document.getElementById('loginBox').classList.add('hidden'); document.getElementById('appBox').classList.remove('hidden'); initAdmin(); } document.getElementById('pinInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); }); })();
+</script>
+</body>
+</html>

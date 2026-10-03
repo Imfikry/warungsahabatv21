@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kasir - Warung Sahabat</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+@keyframes slideIn{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.notif-card{animation:slideIn .35s ease}
+*{font-family:'Plus Jakarta Sans',sans-serif}</style>
+</head>
+<body class="bg-[#f6f6f3]">
+<!-- LOGIN -->
+<div id="loginBox" class="min-h-screen grid place-items-center p-4">
+  <div class="bg-white rounded-2xl border p-6 w-full max-w-sm">
+    <div class="font-extrabold text-lg">Login Kasir</div>
+    <div class="text-sm text-zinc-500">Masukkan PIN Kasir (staff)</div>
+    <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="PIN" class="mt-3 w-full border rounded-xl px-3 py-3 text-center text-xl tracking-widest">
+    <button onclick="doLogin()" class="mt-3 w-full bg-zinc-900 text-white rounded-xl py-3 font-bold">Masuk</button>
+    <div id="pinMsg" class="text-sm text-red-600 mt-2 hidden"></div>
+    <div class="text-xs text-zinc-400 mt-2">Salah 3x terkunci 1 menit. Link kasir aman walau pembeli tau URL.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appBox" class="hidden">
+  <header class="sticky top-0 z-20 bg-white border-b">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="font-extrabold" id="hdrNama">Warung Sahabat — Kasir</div>
+      <div class="flex gap-2">
+        <button onclick="toggleSound()" id="btnSound" class="border rounded-full px-3 py-1 text-sm">🔔 Bunyi: ON</button>
+        <button onclick="logout()" class="border rounded-full px-3 py-1 text-sm">Logout</button>
+      </div>
+    </div>
+  </header>
+  <div id="notifContainer" class="fixed top-3 inset-x-3 z-50 flex flex-col gap-2 pointer-events-none max-w-lg mx-auto"></div>
+
+  <div class="max-w-6xl mx-auto px-4 mt-4">
+    <!-- FILTER -->
+    <div class="bg-white rounded-2xl border p-3 flex flex-wrap gap-2 items-center">
+      <span class="text-sm font-bold">Filter:</span>
+      <select id="fTipe" onchange="renderOrders()" class="border rounded-full px-3 py-1.5 text-sm">
+        <option value="semua">Semua</option><option value="dinein">Dine In</option><option value="takeaway">Takeaway</option>
+      </select>
+      <select id="fStatus" onchange="renderOrders()" class="border rounded-full px-3 py-1.5 text-sm">
+        <option value="semua">Semua Status</option><option value="baru">Baru</option><option value="dimasak">Dimasak</option><option value="siap">Siap</option><option value="lunas">Lunas</option>
+      </select>
+      <span id="countInfo" class="text-sm text-zinc-500 ml-auto">0 pesanan</span>
+    </div>
+
+    <!-- ORDERS -->
+    <div id="ordersGrid" class="grid md:grid-cols-2 gap-3 mt-3"></div>
+
+    <!-- CATATAN HARIAN -->
+    <div class="bg-white rounded-2xl border p-4 mt-6">
+      <div class="flex flex-wrap gap-2 items-center justify-between">
+        <div class="font-extrabold">📒 Catatan Per Hari</div>
+        <div class="flex gap-2 items-center">
+          <input id="inpTanggal" type="date" class="border rounded-xl px-3 py-2 text-sm">
+          <button onclick="setToday()" class="border rounded-xl px-3 py-2 text-sm">Hari ini</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+        <div class="bg-zinc-900 text-white rounded-2xl p-4"><div class="text-xs opacity-70">Total Omzet (Lunas)</div><div id="statOmzet" class="font-extrabold text-lg">Rp 0</div></div>
+        <div class="bg-white border rounded-2xl p-4"><div class="text-xs text-zinc-500">Jumlah Pesanan</div><div id="statJumlah" class="font-extrabold text-lg">0</div></div>
+        <div class="bg-white border rounded-2xl p-4"><div class="text-xs text-zinc-500">Rata-rata / Nota</div><div id="statRata" class="font-extrabold text-lg">Rp 0</div></div>
+        <div class="bg-white border rounded-2xl p-4"><div class="text-xs text-zinc-500">Dine In vs Takeaway</div><div id="statPecah" class="font-bold text-sm">0 / 0</div></div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-3 mt-3">
+        <div class="border rounded-xl p-3"><div class="font-bold text-sm">Menu Terlaris</div><div id="statLaris" class="text-sm mt-1">-</div></div>
+        <div class="border rounded-xl p-3"><div class="font-bold text-sm">Meja Paling Rame</div><div id="statMeja" class="text-sm mt-1">-</div></div>
+      </div>
+      <div class="flex flex-wrap gap-2 mt-3">
+        <button onclick="exportExcelHarian()" class="bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm font-bold">Export Excel</button>
+        <button onclick="exportPDFHarian()" class="bg-zinc-900 text-white rounded-xl px-4 py-2 text-sm font-bold">Export PDF</button>
+        <button onclick="window.print()" class="border rounded-xl px-4 py-2 text-sm font-bold">Cetak</button>
+      </div>
+    </div>
+    <div class="h-10"></div>
+  </div>
+</div>
+
+<audio id="ting" src="https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3?filename=notification-sound-7062.mp3" preload="auto"></audio>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+let soundOn=true;
+let failCount=0, lockUntil=0;
+let ordersCache=[];
+
+function doLogin(){
+  const now=Date.now();
+  if(now < lockUntil){ document.getElementById('pinMsg').classList.remove('hidden'); document.getElementById('pinMsg').textContent='Terkunci. Coba lagi dalam '+Math.ceil((lockUntil-now)/1000)+' detik.'; return; }
+  const pin=document.getElementById('pinInput').value.trim();
+  const s=getSettings();
+  if(pin===s.pinKasir || pin===s.pinAdmin){
+    localStorage.setItem('kasir_login','1');
+    document.getElementById('loginBox').classList.add('hidden');
+    document.getElementById('appBox').classList.remove('hidden');
+    document.getElementById('hdrNama').textContent=s.nama+' — Kasir';
+    initKasir();
+  } else {
+    failCount++;
+    if(failCount>=3){ lockUntil=Date.now()+60000; document.getElementById('pinMsg').classList.remove('hidden'); document.getElementById('pinMsg').textContent='PIN salah 3x. Terkunci 60 detik.'; }
+    else { document.getElementById('pinMsg').classList.remove('hidden'); document.getElementById('pinMsg').textContent='PIN salah ('+failCount+'/3)'; }
+  }
+}
+function logout(){ localStorage.removeItem('kasir_login'); location.reload(); }
+function toggleSound(){ soundOn=!soundOn; document.getElementById('btnSound').textContent=soundOn?'🔔 Bunyi: ON':'🔕 Bunyi: OFF'; }
+function playTing(){
+  if(!soundOn) return;
+  // coba audio tag
+  const a=document.getElementById('ting');
+  if(a){ a.currentTime=0; a.play().catch(()=>{}); }
+  // fallback beep WebAudio (lebih keras di HP)
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const beep = (freq, dur, delay)=>{
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.frequency.value=freq; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.5, ctx.currentTime+delay);
+      g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+delay+dur);
+      o.start(ctx.currentTime+delay); o.stop(ctx.currentTime+delay+dur);
+    };
+    beep(880,0.18,0); beep(1320,0.18,0.22); beep(1760,0.35,0.44);
+  }catch(e){}
+  if(navigator.vibrate) navigator.vibrate([300,100,300,100,400]);
+  // request notifikasi sistem jika diizinkan
+  if(window.Notification && Notification.permission==='granted'){
+    // akan dipanggil di showOrderNotif
+  }
+}
+let titleBlinkTimer=null, origTitle=document.title;
+function startTitleBlink(text){
+  if(titleBlinkTimer) clearInterval(titleBlinkTimer);
+  let on=true;
+  titleBlinkTimer=setInterval(()=>{ document.title = on ? text : origTitle; on=!on; }, 700);
+  setTimeout(()=>{ clearInterval(titleBlinkTimer); document.title=origTitle; titleBlinkTimer=null; }, 10000);
+}
+function showOrderNotif(order){
+  // toast di dalam page
+  const wrap=document.getElementById('notifContainer');
+  if(!wrap) return;
+  const card=document.createElement('div');
+  const badge = order.tipe==='dinein' ? '🍽️ DINE IN • Meja '+order.meja : '🥡 TAKEAWAY • '+order.nama;
+  const itemsText = order.items.map(i=> i.nama+' x'+i.qty).join(', ');
+  card.className='notif-card bg-white border-2 border-blue-600 rounded-2xl shadow-2xl p-4 pointer-events-auto';
+  card.innerHTML = `
+    <div class="flex items-start justify-between gap-3">
+      <div class="flex-1">
+        <div class="text-xs font-bold text-blue-600 tracking-wide">🔔 PESANAN BARU!</div>
+        <div class="font-extrabold text-zinc-900">${badge}</div>
+        <div class="text-xs text-zinc-500">${fmtDate(order.created_at)} • ${order.id}</div>
+        <div class="text-sm text-zinc-700 mt-1 line-clamp-2">${itemsText}</div>
+        <div class="font-extrabold text-blue-600 mt-1">${rupiah(order.total)}</div>
+      </div>
+      <button onclick="this.closest('.notif-card').remove()" class="text-zinc-400 hover:text-zinc-700 text-xl leading-none">×</button>
+    </div>
+    <button onclick="this.closest('.notif-card').remove()" class="mt-2 w-full bg-blue-600 text-white rounded-xl py-2 text-sm font-bold">Lihat Pesanan</button>
+  `;
+  wrap.appendChild(card);
+  // auto hapus 10 detik
+  setTimeout(()=>{ card.style.transition='opacity .4s'; card.style.opacity='0'; setTimeout(()=>card.remove(),400); }, 10000);
+  // native notification
+  if(window.Notification && Notification.permission==='granted'){
+    try{
+      const n=new Notification('🔔 Pesanan Baru - '+badge, {body: itemsText+' • '+rupiah(order.total), icon: 'https://cdn-icons-png.flaticon.com/512/3176/3176298.png'});
+      n.onclick=()=>{ window.focus(); n.close(); };
+      setTimeout(()=>n.close(), 8000);
+    }catch(e){}
+  }
+  startTitleBlink('🔔 PESANAN BARU!');
+}
+function ensureNotifPermission(){
+  if(window.Notification && Notification.permission==='default'){
+    Notification.requestPermission().then(()=>{});
+  }
+}
+
+async function initKasir(){
+  ensureNotifPermission();
+  if(hasSupa()){ await syncOrdersFromSupa(); await syncMenusFromSupa(); }
+  refreshOrders();
+  document.getElementById('inpTanggal').value=todayStr();
+  renderCatatan();
+  onBC(msg=>{
+    if(msg.type==='orders') { refreshOrders(true); renderCatatan(); }
+    if(msg.type==='settings'){ document.getElementById('hdrNama').textContent=msg.payload.nama+' — Kasir'; }
+    if(msg.type==='menus'){ refreshOrders(); }
+  });
+  if(hasSupa()){
+    supa.channel('orders-kasir').on('postgres_changes',{event:'INSERT',schema:'public',table:'orders'}, payload=>{
+      const ord=payload.new; if(ord){
+        try{
+          const mapped={id:ord.id,tipe:ord.tipe,meja:ord.meja,nama:ord.nama,wa:ord.wa,jamAmbil:ord.jam_ambil,catatan:ord.catatan,items:typeof ord.items==='string'?JSON.parse(ord.items):ord.items,subtotal:ord.subtotal,pajak:ord.pajak,total:ord.total,status:ord.status,created_at:ord.created_at};
+          const all=getOrders(); if(!all.find(x=>x.id===mapped.id)){ all.unshift(mapped); localStorage.setItem(LS_ORDERS, JSON.stringify(all)); }
+          showOrderNotif(mapped); playTing();
+        }catch(e){}
+      }
+      refreshOrders(true); renderCatatan();
+    }).on('postgres_changes',{event:'UPDATE',schema:'public',table:'orders'}, payload=>{
+      try{
+        const ord=payload.new; if(ord){
+          const all=getOrders(); const idx=all.findIndex(x=>x.id===ord.id);
+          if(idx>=0){ all[idx].status=ord.status; localStorage.setItem(LS_ORDERS, JSON.stringify(all)); }
+        }
+      }catch(e){}
+      refreshOrders(); renderCatatan();
+    }).subscribe();
+  }
+  // polling fallback + sync settings
+  setInterval(async()=>{ if(hasSupa()){ const s2=await syncSettingsFromSupa(); if(s2) document.getElementById('hdrNama').textContent=s2.nama+' — Kasir'; } }, 5000);
+  // polling fallback (sinkron Supabase supaya beda HP masuk)
+  setInterval(async ()=>{ if(hasSupa()) await syncOrdersFromSupa(); refreshOrders(); renderCatatan(); }, 3000);
+}
+
+var _lastCount = 0;
+function refreshOrders(isNew=false){
+  const all=getOrders();
+  if(all.length > _lastCount && _lastCount!==0){
+    const newest=all[0]; playTing(); showOrderNotif(newest);
+  }
+  _lastCount=all.length;
+  // sort: baru first, then by time desc
+  const orderRank={baru:0,dimasak:1,siap:2,lunas:3};
+  ordersCache=[...all].sort((a,b)=> (orderRank[a.status]-orderRank[b.status]) || (new Date(b.created_at)-new Date(a.created_at)));
+  // playTing handled above
+  renderOrders();
+}
+function filteredOrders(){
+  const t=document.getElementById('fTipe').value;
+  const s=document.getElementById('fStatus').value;
+  return ordersCache.filter(o=> (t==='semua'||o.tipe===t) && (s==='semua'||o.status===s));
+}
+function renderOrders(){
+  const list=filteredOrders();
+  document.getElementById('countInfo').textContent=list.length+' pesanan';
+  const grid=document.getElementById('ordersGrid');
+  if(list.length===0){ grid.innerHTML='<div class="text-sm text-zinc-500 bg-white border rounded-2xl p-6 text-center">Belum ada pesanan</div>'; return; }
+  grid.innerHTML=list.map(o=>{
+    const badge = o.tipe==='dinein' ? '<span class="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">🍽️ DINE IN</span>' : '<span class="bg-orange-500 text-white text-xs px-2 py-1 rounded-full">🥡 TAKEAWAY</span>';
+    const stColor={baru:'bg-blue-600',dimasak:'bg-blue-600',siap:'bg-emerald-600',lunas:'bg-zinc-900'}[o.status]||'bg-zinc-400';
+    const info = o.tipe==='dinein' ? ('Meja '+o.meja + (o.nama ? ' - '+o.nama : '')) : o.nama;
+    return `
+    <div class="bg-white rounded-2xl border p-4">
+      <div class="flex items-center justify-between">
+        <div class="flex gap-2 items-center">${badge} <span class="text-xs ${stColor} text-white px-2 py-1 rounded-full">${o.status.toUpperCase()}</span></div>
+        <div class="text-xs text-zinc-500">${fmtDate(o.created_at)}</div>
+      </div>
+      <div class="font-bold mt-2">${o.id}</div>
+      <div class="text-sm text-zinc-600">${info}</div>
+      ${o.catatan?'<div class="text-xs bg-blue-50 border border-blue-200 rounded-lg px-2 py-1 mt-1">Catatan: '+o.catatan+'</div>':''}
+      <div class="mt-2 space-y-1 text-sm">${o.items.map(i=>'<div class="flex justify-between"><span>'+i.nama+' x'+i.qty+'</span><span>'+rupiah(i.harga*i.qty)+'</span></div>').join('')}</div>
+      <div class="flex justify-between font-extrabold border-t mt-2 pt-2"><span>Total</span><span>${rupiah(o.total)}</span></div>
+      <div class="grid grid-cols-3 gap-2 mt-3">
+        ${o.status==='baru'?'<button onclick="updStatus(\''+o.id+'\',\'dimasak\')" class="bg-blue-600 text-white rounded-xl py-2 text-sm font-bold">Dimasak</button>':''}
+        ${o.status==='dimasak'?'<button onclick="updStatus(\''+o.id+'\',\'siap\')" class="bg-emerald-600 text-white rounded-xl py-2 text-sm font-bold">Tandai Siap</button>':''}
+        ${o.status==='siap'?'<button onclick="updStatus(\''+o.id+'\',\'lunas\')" class="bg-zinc-900 text-white rounded-xl py-2 text-sm font-bold col-span-3">Tandai Lunas (Bayar di Kasir)</button>':''}
+        ${o.status==='lunas'?'<span class="col-span-3 text-center text-sm bg-zinc-100 rounded-xl py-2">✅ LUNAS</span>':''}
+        ${o.status==='baru'?'':''}
+      </div>
+      <button onclick="downloadNotaById('${o.id}')" class="mt-2 w-full border rounded-xl py-2 text-sm">📄 Nota PDF</button>
+    </div>`;
+  }).join('');
+}
+function updStatus(id, next){
+  const orders=getOrders();
+  const o=orders.find(x=>x.id===id); if(!o) return;
+  o.status=next; saveOrders(orders);
+  if(hasSupa()) supa.from('orders').update({status:next}).eq('id',id).then(()=>{});
+  refreshOrders(); renderCatatan();
+}
+function downloadNotaById(id){
+  const o=getOrders().find(x=>x.id===id); if(!o) return; downloadNota(o, getSettings());
+}
+// Catatan
+function setToday(){ document.getElementById('inpTanggal').value=todayStr(); renderCatatan(); }
+function renderCatatan(){
+  const tgl=document.getElementById('inpTanggal')?.value || todayStr();
+  const all=getOrders();
+  const dayOrders=all.filter(o=> o.created_at.slice(0,10)===tgl);
+  const lunas=dayOrders.filter(o=>o.status==='lunas');
+  const omzet=lunas.reduce((a,b)=>a+b.total,0);
+  const rata=lunas.length? Math.round(omzet/lunas.length):0;
+  const dine=dayOrders.filter(o=>o.tipe==='dinein').length;
+  const take=dayOrders.filter(o=>o.tipe==='takeaway').length;
+  document.getElementById('statOmzet').textContent=rupiah(omzet);
+  document.getElementById('statJumlah').textContent=dayOrders.length+' ('+lunas.length+' lunas)';
+  document.getElementById('statRata').textContent=rupiah(rata);
+  document.getElementById('statPecah').textContent=dine+' Dine In / '+take+' Takeaway';
+  // terlaris
+  const counter={};
+  dayOrders.forEach(o=> o.items.forEach(i=> counter[i.nama]=(counter[i.nama]||0)+i.qty));
+  const sorted=Object.entries(counter).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  document.getElementById('statLaris').textContent= sorted.length? sorted.map(([n,q])=> n+' ('+q+')').join(', ') : '-';
+  const mejaCnt={};
+  dayOrders.filter(o=>o.tipe==='dinein').forEach(o=> mejaCnt['Meja '+String(o.meja).padStart(2,'0')]=(mejaCnt['Meja '+String(o.meja).padStart(2,'0')]||0)+1);
+  const mejaSorted=Object.entries(mejaCnt).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  document.getElementById('statMeja').textContent= mejaSorted.length? mejaSorted.map(([k,v])=>k+' ('+v+')').join(', ') : '-';
+}
+function exportExcelHarian(){
+  const tgl=document.getElementById('inpTanggal').value||todayStr();
+  const rows=getOrders().filter(o=>o.created_at.slice(0,10)===tgl);
+  if(!rows.length) return alert('Tidak ada data tanggal ini');
+  exportOrdersExcel(rows, getSettings(), 'Rekap_'+tgl+'.xlsx');
+}
+function exportPDFHarian(){
+  const tgl=document.getElementById('inpTanggal').value||todayStr();
+  const rows=getOrders().filter(o=>o.created_at.slice(0,10)===tgl);
+  if(!rows.length) return alert('Tidak ada data tanggal ini');
+  exportOrdersPDF(rows, getSettings(), 'Rekap Harian '+tgl);
+}
+
+// auto login if stored
+(function(){ initSupa(); if(localStorage.getItem('kasir_login')==='1'){ document.getElementById('loginBox').classList.add('hidden'); document.getElementById('appBox').classList.remove('hidden'); document.getElementById('hdrNama').textContent=getSettings().nama+' — Kasir'; initKasir(); } document.getElementById('inpTanggal').value=todayStr();
+document.getElementById('pinInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+})();
+</script>
+</body>
+</html>

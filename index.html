@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Warung Sahabat - Pesan Online</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>*{font-family:'Plus Jakarta Sans',sans-serif}</style>
+</head>
+<body class="bg-[#fafaf7] text-zinc-900">
+<!-- HEADER -->
+<header class="sticky top-0 z-30 bg-white border-b">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-blue-600 grid place-items-center text-white font-extrabold">G</div>
+      <div>
+        <div id="hdrNama" class="font-extrabold leading-none">Warung Sahabat</div>
+        <div id="hdrAlamat" class="text-xs text-zinc-500">Jl. Sahabat No. 12, Banjarmasin</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- TIPE PESANAN -->
+<div class="max-w-6xl mx-auto px-4 mt-4">
+  <div class="bg-white rounded-2xl border p-3">
+    <div class="font-bold mb-2">Pilih Tipe Pesanan</div>
+    <div class="grid grid-cols-2 gap-2">
+      <button id="btnDine" onclick="setTipe('dinein')" class="rounded-xl border-2 border-blue-600 bg-blue-50 p-3 text-left">
+        <div class="text-lg">🍽️ DINE IN</div><div class="text-xs text-zinc-500">Makan di tempat • pilih No. Meja</div>
+      </button>
+      <button id="btnTake" onclick="setTipe('takeaway')" class="rounded-xl border p-3 text-left">
+        <div class="text-lg">🥡 TAKEAWAY</div><div class="text-xs text-zinc-500">Bawa pulang • isi Nama</div>
+      </button>
+    </div>
+    <!-- Dine In fields -->
+    <div id="boxDine" class="mt-3 grid grid-cols-1 gap-2">
+      <label class="text-sm font-semibold">Nomor Meja <span class="text-red-500">*</span></label>
+      <input id="inpMeja" type="text" inputmode="numeric" placeholder="Contoh: 05 / 12" class="border rounded-xl px-3 py-2.5 bg-white">
+      <input id="inpNamaDine" placeholder="Nama *" class="border rounded-xl px-3 py-2.5">
+      <input id="inpCatatan" placeholder="Catatan (opsional)" class="border rounded-xl px-3 py-2.5">
+    </div>
+    <!-- Takeaway fields -->
+    <div id="boxTake" class="mt-3 hidden grid grid-cols-1 gap-2">
+      <input id="inpNama" placeholder="Nama *" class="border rounded-xl px-3 py-2.5">
+      <input id="inpCatatanTake" placeholder="Catatan (opsional)" class="border rounded-xl px-3 py-2.5">
+    </div>
+  </div>
+</div>
+
+<!-- KATEGORI + MENU -->
+<div class="max-w-6xl mx-auto px-4 mt-4">
+  <div id="catBar" class="flex gap-2 overflow-auto pb-2"></div>
+  <div id="menuGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-2"></div>
+</div>
+
+<!-- CART BAR -->
+<div class="fixed bottom-0 inset-x-0 bg-white border-t z-20">
+  <div class="max-w-6xl mx-auto px-4 py-3">
+    <div id="cartList" class="space-y-2 max-h-32 overflow-auto mb-2 hidden"></div>
+    <div class="flex items-center justify-between text-sm">
+      <div>Total <span id="cartTot" class="font-extrabold">Rp 0</span></div>
+      <div id="cartCount" class="text-xs bg-zinc-900 text-white px-2 py-1 rounded-full">0 item</div>
+    </div>
+    <button onclick="kirimPesanan()" class="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl">Kirim Pesanan</button>
+    <div class="text-[11px] text-zinc-500 text-center mt-1">Bayar Pesanan di Kasir</div>
+  </div>
+</div>
+
+<!-- STATUS PESANAN TERAKHIR -->
+<div id="statusBox" class="max-w-6xl mx-auto px-4 pb-32 mt-4 hidden">
+  <div class="bg-white border rounded-2xl p-4">
+    <div class="font-bold">Status Pesanan Kamu</div>
+    <div id="statusId" class="text-xs text-zinc-500"></div>
+    <div id="statusSteps" class="flex gap-2 mt-3"></div>
+    <div id="statusInfo" class="text-sm mt-2"></div>
+    <button onclick="downloadNotaLast()" class="mt-3 w-full border rounded-xl py-2.5 font-bold">📄 Download Nota PDF</button>
+  </div>
+</div>
+
+<div class="h-40"></div>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+let tipe='dinein';
+let catActive='Semua';
+let cart=[];
+let lastOrder=null;
+let settings=getSettings();
+let menus=getMenus();
+
+function setTipe(t){
+  tipe=t;
+  document.getElementById('boxDine').classList.toggle('hidden', t!=='dinein');
+  document.getElementById('boxTake').classList.toggle('hidden', t!=='takeaway');
+  document.getElementById('btnDine').className = t==='dinein' ? 'rounded-xl border-2 border-blue-600 bg-blue-50 p-3 text-left' : 'rounded-xl border p-3 text-left';
+  document.getElementById('btnTake').className = t==='takeaway' ? 'rounded-xl border-2 border-blue-600 bg-blue-50 p-3 text-left' : 'rounded-xl border p-3 text-left';
+}
+function renderMeja(){
+  // meja sekarang ketik manual, tidak perlu render dropdown
+}
+function renderCats(){
+  const cats=['Semua', ...new Set(menus.map(m=>m.kategori))];
+  const bar=document.getElementById('catBar');
+  bar.innerHTML=cats.map(c=> `<button onclick="catActive='${c}';renderCats();renderMenu()" class="px-4 py-1.5 rounded-full border text-sm whitespace-nowrap ${catActive===c?'bg-zinc-900 text-white border-zinc-900':'bg-white'}">${c}</button>`).join('');
+}
+function renderMenu(){
+  const grid=document.getElementById('menuGrid');
+  const filtered = catActive==='Semua' ? menus : menus.filter(m=>m.kategori===catActive);
+  grid.innerHTML = filtered.map(m=> `
+    <div class="bg-white rounded-2xl border overflow-hidden flex flex-col ${m.stok==='habis'?'opacity-60':''}">
+      <img src="${m.foto}" class="h-20 w-full object-cover">
+      <div class="p-2 flex-1 flex flex-col">
+        <div class="text-[10px] bg-zinc-100 w-fit px-2 py-0.5 rounded-full">${m.kategori}</div>
+        <div class="font-bold text-xs leading-tight mt-1 line-clamp-2">${m.nama}</div>
+        <div class="text-blue-600 font-extrabold text-xs">${rupiah(m.harga)}</div>
+        <div class="mt-2 flex gap-1">
+          ${m.stok==='habis' ? '<span class="flex-1 text-center text-xs bg-zinc-200 py-1.5 rounded-xl font-bold">Habis</span>' : `
+          <button onclick="addCart('${m.id}')" class="flex-1 bg-zinc-900 text-white rounded-xl py-1.5 text-xs font-bold">+ Tambah</button>
+          `}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+function addCart(id){
+  const m=menus.find(x=>x.id===id);
+  if(!m || m.stok==='habis') return;
+  const found=cart.find(c=>c.id===id);
+  if(found) found.qty++; else cart.push({id:m.id, nama:m.nama, harga:m.harga, qty:1});
+  renderCart();
+}
+function renderCart(){
+  const box=document.getElementById('cartList');
+  if(cart.length===0){ box.classList.add('hidden');}
+  else { box.classList.remove('hidden');
+    box.innerHTML=cart.map((c,i)=> `
+      <div class="flex items-center justify-between bg-zinc-50 border rounded-xl px-3 py-2">
+        <div class="text-sm"><b>${c.nama}</b> • ${rupiah(c.harga)}</div>
+        <div class="flex items-center gap-2">
+          <button onclick="chgQty(${i},-1)" class="w-7 h-7 rounded-full border bg-white">−</button>
+          <span class="font-bold text-sm">${c.qty}</span>
+          <button onclick="chgQty(${i},1)" class="w-7 h-7 rounded-full border bg-white">+</button>
+        </div>
+      </div>
+    `).join('');
+  }
+  const calc=calcCart(cart, settings.pajak);
+  document.getElementById('cartTot').textContent=rupiah(calc.total);
+  document.getElementById('cartCount').textContent=cart.reduce((a,b)=>a+b.qty,0)+' item';
+}
+function chgQty(i,d){
+  cart[i].qty+=d;
+  if(cart[i].qty<=0) cart.splice(i,1);
+  renderCart();
+}
+function kirimPesanan(){
+  if(cart.length===0) return alert('Keranjang masih kosong');
+  if(tipe==='dinein'){
+    const meja=document.getElementById('inpMeja').value.trim();
+    const namaDine=document.getElementById('inpNamaDine').value.trim();
+    if(!meja) return alert('Isi nomor meja');
+    if(!namaDine) return alert('Dine In wajib isi Nama');
+  } else {
+    const nama=document.getElementById('inpNama').value.trim();
+    if(!nama) return alert('Takeaway wajib isi Nama');
+  }
+  const calc=calcCart(cart, settings.pajak);
+  const mejaVal = tipe==='dinein' ? document.getElementById('inpMeja').value.trim() : null;
+  const namaVal = tipe==='dinein' ? document.getElementById('inpNamaDine').value.trim() : document.getElementById('inpNama').value.trim();
+  const catatanVal = tipe==='dinein' ? document.getElementById('inpCatatan').value.trim() : document.getElementById('inpCatatanTake').value.trim();
+  const order={
+    id:genId(),
+    tipe, meja: mejaVal,
+    nama: namaVal,
+    wa: null,
+    jamAmbil: null,
+    catatan: catatanVal,
+    items: JSON.parse(JSON.stringify(cart)),
+    subtotal: calc.subtotal, pajak: calc.pajak, total: calc.total,
+    status:'baru', // baru -> dimasak -> siap -> lunas
+    created_at: new Date().toISOString()
+  };
+  const orders=getOrders(); orders.unshift(order); saveOrders(orders);
+  // supabase insert if available
+  if(hasSupa()){
+    supa.from('orders').insert([{
+      id:order.id, tipe:order.tipe, meja:order.meja, nama:order.nama, wa:order.wa, jam_ambil:order.jamAmbil,
+      catatan:order.catatan, items:order.items, subtotal:order.subtotal, pajak:order.pajak, total:order.total, status:order.status
+    }]).then(()=>{});
+  }
+  lastOrder=order;
+  localStorage.setItem('resto_last_order', order.id);
+  cart=[]; renderCart();
+  showStatus(order);
+  alert('Pesanan terkirim! ID: '+order.id);
+}
+function showStatus(order){
+  document.getElementById('statusBox').classList.remove('hidden');
+  document.getElementById('statusId').textContent='ID '+order.id+' • '+fmtDate(order.created_at)+' • '+(order.tipe==='dinein'?('DINE IN Meja '+order.meja+(order.nama?' - '+order.nama:'')):'TAKEAWAY '+order.nama);
+  const steps=['baru','dimasak','siap'];
+  const labels={baru:'Baru', dimasak:'Dimasak', siap:'Siap'};
+  document.getElementById('statusSteps').innerHTML=steps.map(s=>{
+    const active = steps.indexOf(s) <= steps.indexOf(order.status) || order.status==='lunas';
+    const isCurrent = s===order.status;
+    return `<div class="flex-1 text-center rounded-xl py-2 text-xs font-bold border ${active?'bg-emerald-500 text-white border-emerald-500':'bg-zinc-100'} ${isCurrent?'ring-2 ring-blue-400':''}">${labels[s]}</div>`;
+  }).join('');
+  document.getElementById('statusInfo').textContent = order.status==='lunas' ? 'Sudah Lunas — terima kasih!' : order.status==='siap' ? 'Pesanan siap diambil! Silakan ke kasir.' : order.status==='dimasak' ? 'Pesanan sedang dimasak...' : 'Pesanan baru diterima kasir';
+  if(order.status==='lunas') document.getElementById('statusInfo').innerHTML+=' <span class="bg-emerald-100 px-2 py-0.5 rounded-full text-xs">LUNAS</span>';
+}
+function downloadNotaLast(){
+  if(!lastOrder) return alert('Belum ada pesanan');
+  const fresh=getOrders().find(o=>o.id===lastOrder.id) || lastOrder;
+  downloadNota(fresh, settings);
+}
+// init
+(function(){
+  initSupa();
+  document.getElementById('hdrNama').textContent=settings.nama;
+  document.getElementById('hdrAlamat').textContent=settings.alamat;
+  renderMeja(); renderCats(); renderMenu(); renderCart();
+  // restore last order tracking
+  const lastId=localStorage.getItem('resto_last_order');
+  if(lastId){
+    const o=getOrders().find(x=>x.id===lastId);
+    if(o){ lastOrder=o; showStatus(o); }
+  }
+  // realtime update status via BC/storage
+  onBC(msg=>{
+    if(msg.type==='orders'){
+      menus=getMenus(); settings=getSettings();
+      if(lastOrder){
+        const upd=getOrders().find(x=>x.id===lastOrder.id);
+        if(upd){ lastOrder=upd; showStatus(upd); }
+      }
+    }
+    if(msg.type==='menus'){ menus=msg.payload; renderCats(); renderMenu(); }
+    if(msg.type==='settings'){ settings=msg.payload; document.getElementById('hdrNama').textContent=settings.nama; document.getElementById('hdrAlamat').textContent=settings.alamat; renderMeja(); renderCart(); }
+  });
+  // periodic sync settings/menus supaya alamat & menu baru masuk
+  setInterval(async()=>{ if(hasSupa()){ const s2=await syncSettingsFromSupa(); if(s2){ settings=s2; document.getElementById('hdrNama').textContent=s2.nama; document.getElementById('hdrAlamat').textContent=s2.alamat; renderCart(); } const m2=await syncMenusFromSupa(); if(m2){ menus=m2; renderCats(); renderMenu(); } } }, 5000);
+  // listen supabase realtime if enabled
+  if(hasSupa()){
+    supa.channel('orders-pembeli').on('postgres_changes',{event:'*',schema:'public',table:'orders'}, payload=>{
+      const orders=getOrders();
+      if(payload.eventType==='UPDATE'){
+        const idx=orders.findIndex(o=>o.id===payload.new.id);
+        if(idx>=0){ orders[idx].status=payload.new.status; saveOrders(orders); if(lastOrder && lastOrder.id===payload.new.id) showStatus(orders[idx]);}
+      }
+    }).subscribe();
+  }
+})();
+</script>
+</body>
+</html>
