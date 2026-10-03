@@ -44,6 +44,7 @@
     <!-- TABS -->
     <div class="flex gap-2 overflow-auto pb-2">
       <button onclick="tab('pesanan')" id="tab-pesanan" class="px-4 py-2 rounded-full bg-zinc-900 text-white text-sm font-bold">Pesanan (Kasir)</button>
+      <button onclick="tab('catatan')" id="tab-catatan" class="px-4 py-2 rounded-full bg-white border text-sm font-bold">📒 Catatan Harian</button>
       <button onclick="tab('menu')" id="tab-menu" class="px-4 py-2 rounded-full bg-white border text-sm font-bold">Menu</button>
       <button onclick="tab('stok')" id="tab-stok" class="px-4 py-2 rounded-full bg-white border text-sm font-bold">Stok</button>
       <button onclick="tab('pengaturan')" id="tab-pengaturan" class="px-4 py-2 rounded-full bg-white border text-sm font-bold">Pengaturan</button>
@@ -59,8 +60,11 @@
         <span id="countInfo" class="text-sm text-zinc-500 ml-auto"></span>
       </div>
       <div id="ordersGrid" class="grid md:grid-cols-2 gap-3 mt-3"></div>
-      <!-- Catatan harian -->
-      <div class="bg-white rounded-2xl border p-4 mt-4">
+    </div>
+
+    <!-- TAB: CATATAN HARIAN -->
+    <div id="pane-catatan" class="hidden">
+      <div class="bg-white rounded-2xl border p-4 mt-3">
         <div class="flex gap-2 items-center justify-between"><div class="font-bold">📒 Catatan Per Hari</div><div class="flex gap-2"><input id="inpTanggal" type="date" class="border rounded-xl px-3 py-2 text-sm"><button onclick="setToday()" class="border rounded-xl px-3 py-2 text-sm">Hari ini</button></div></div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
           <div class="bg-zinc-900 text-white rounded-2xl p-4"><div class="text-xs opacity-70">Omzet (Lunas)</div><div id="statOmzet" class="font-extrabold">Rp 0</div></div>
@@ -264,10 +268,11 @@ function doLogin(){
 }
 function logout(){ localStorage.removeItem('admin_login'); location.reload(); }
 function tab(name){
-  ['pesanan','menu','stok','pengaturan','laporan','qr'].forEach(t=>{
+  ['pesanan','catatan','menu','stok','pengaturan','laporan','qr'].forEach(t=>{
     document.getElementById('pane-'+t).classList.toggle('hidden', t!==name);
     document.getElementById('tab-'+t).className = t===name ? 'px-4 py-2 rounded-full bg-zinc-900 text-white text-sm font-bold' : 'px-4 py-2 rounded-full bg-white border text-sm font-bold';
   });
+  if(name==='catatan') renderCatatan();
   if(name==='qr') genQR();
   if(name==='menu') renderMenuAdmin();
   if(name==='stok') renderStok();

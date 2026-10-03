@@ -42,6 +42,14 @@
   <div id="notifContainer" class="fixed top-3 inset-x-3 z-50 flex flex-col gap-2 pointer-events-none max-w-lg mx-auto"></div>
 
   <div class="max-w-6xl mx-auto px-4 mt-4">
+    <!-- TABS -->
+    <div class="flex gap-2 overflow-auto pb-2">
+      <button onclick="tab('pesanan')" id="tab-pesanan" class="px-4 py-2 rounded-full bg-zinc-900 text-white text-sm font-bold">Pesanan</button>
+      <button onclick="tab('catatan')" id="tab-catatan" class="px-4 py-2 rounded-full bg-white border text-sm font-bold">📒 Catatan Harian</button>
+    </div>
+
+    <!-- TAB: PESANAN -->
+    <div id="pane-pesanan" class="">
     <!-- FILTER -->
     <div class="bg-white rounded-2xl border p-3 flex flex-wrap gap-2 items-center">
       <span class="text-sm font-bold">Filter:</span>
@@ -56,9 +64,11 @@
 
     <!-- ORDERS -->
     <div id="ordersGrid" class="grid md:grid-cols-2 gap-3 mt-3"></div>
+    </div><!-- /pane-pesanan -->
 
-    <!-- CATATAN HARIAN -->
-    <div class="bg-white rounded-2xl border p-4 mt-6">
+    <!-- TAB: CATATAN HARIAN -->
+    <div id="pane-catatan" class="hidden">
+    <div class="bg-white rounded-2xl border p-4 mt-3">
       <div class="flex flex-wrap gap-2 items-center justify-between">
         <div class="font-extrabold">📒 Catatan Per Hari</div>
         <div class="flex gap-2 items-center">
@@ -82,6 +92,7 @@
         <button onclick="window.print()" class="border rounded-xl px-4 py-2 text-sm font-bold">Cetak</button>
       </div>
     </div>
+    </div><!-- /pane-catatan -->
     <div class="h-10"></div>
   </div>
 </div>
@@ -93,6 +104,14 @@
 let soundOn=true;
 let failCount=0, lockUntil=0;
 let ordersCache=[];
+
+function tab(name){
+  ['pesanan','catatan'].forEach(t=>{
+    document.getElementById('pane-'+t).classList.toggle('hidden', t!==name);
+    document.getElementById('tab-'+t).className = t===name ? 'px-4 py-2 rounded-full bg-zinc-900 text-white text-sm font-bold' : 'px-4 py-2 rounded-full bg-white border text-sm font-bold';
+  });
+  if(name==='catatan') renderCatatan();
+}
 
 function doLogin(){
   const now=Date.now();
