@@ -136,6 +136,15 @@ function playTing(){
     // akan dipanggil di showOrderNotif
   }
 }
+const _notifiedIds=new Set();
+function notifyOrder(order){
+  if(!order || !order.id) return;
+  if(_notifiedIds.has(order.id)) return;
+  _notifiedIds.add(order.id);
+  setTimeout(()=>_notifiedIds.delete(order.id), 60000);
+  showOrderNotif(order);
+  playTing();
+}
 let titleBlinkTimer=null, origTitle=document.title;
 function startTitleBlink(text){
   if(titleBlinkTimer) clearInterval(titleBlinkTimer);
@@ -200,7 +209,7 @@ async function initKasir(){
         try{
           const mapped={id:ord.id,tipe:ord.tipe,meja:ord.meja,nama:ord.nama,wa:ord.wa,jamAmbil:ord.jam_ambil,catatan:ord.catatan,items:typeof ord.items==='string'?JSON.parse(ord.items):ord.items,subtotal:ord.subtotal,pajak:ord.pajak,total:ord.total,status:ord.status,created_at:ord.created_at};
           const all=getOrders(); if(!all.find(x=>x.id===mapped.id)){ all.unshift(mapped); localStorage.setItem(LS_ORDERS, JSON.stringify(all)); }
-          showOrderNotif(mapped); playTing();
+          notifyOrder(mapped);
         }catch(e){}
       }
       refreshOrders(true); renderCatatan();
@@ -224,7 +233,7 @@ var _lastCount = 0;
 function refreshOrders(isNew=false){
   const all=getOrders();
   if(all.length > _lastCount && _lastCount!==0){
-    const newest=all[0]; playTing(); showOrderNotif(newest);
+    const newest=all[0]; notifyOrder(newest);
   }
   _lastCount=all.length;
   // sort: baru first, then by time desc
