@@ -59,6 +59,7 @@
       <select id="fStatus" onchange="renderOrders()" class="border rounded-full px-3 py-1.5 text-sm">
         <option value="semua">Semua Status</option><option value="baru">Baru</option><option value="dimasak">Dimasak</option><option value="siap">Siap</option><option value="lunas">Lunas</option>
       </select>
+      <input id="fNama" oninput="renderOrders()" type="text" placeholder="Cari nama..." class="border rounded-full px-3 py-1.5 text-sm w-32">
       <span id="countInfo" class="text-sm text-zinc-500 ml-auto">0 pesanan</span>
     </div>
 
@@ -252,9 +253,25 @@ async function initKasir(){
   setInterval(async()=>{ if(hasSupa()){ const s2=await syncSettingsFromSupa(); if(s2) document.getElementById('hdrNama').textContent=s2.nama+' — Kasir'; } }, 5000);
   // polling fallback (sinkron Supabase supaya beda HP masuk)
   setInterval(async ()=>{ if(hasSupa()) await syncOrdersFromSupa(); refreshOrders(); renderCatatan(); }, 3000);
-}
 
-var _lastCount = 0;
+  // Auto-status
+  setInterval(()=>{
+    const now=new Date();
+    const all=getOrders();
+    let changed=false;
+    all.forEach(o=>{
+      if(o.status==='baru'){
+        const created=new Date(o.created_at);
+        if((now-created) > 120000){ // > 2 menit
+          o.status='dimasak';
+          changed=true;
+          if(hasSupa()) supa.from('orders').update({status:'dimasak'}).eq('id',o.id).then(()=>{});
+        }
+      }
+    });
+    if(changed){ saveOrders(all); refreshOrders(); renderCatatan(); }
+  }, 30000); // Cek tiap 30 detik
+}
 function refreshOrders(isNew=false){
   const all=getOrders();
   if(all.length > _lastCount && _lastCount!==0){
@@ -269,7 +286,8 @@ function refreshOrders(isNew=false){
 function filteredOrders(){
   const t=document.getElementById('fTipe').value;
   const s=document.getElementById('fStatus').value;
-  return ordersCache.filter(o=> (t==='semua'||o.tipe===t) && (s==='semua'||o.status===s));
+  const n=document.getElementById('fNama').value.toLowerCase();
+  return ordersCache.filter(o=> (t==='semua'||o.tipe===t) && (s==='semua'||o.status===s) && (o.nama.toLowerCase().includes(n)));
 }
 function renderOrders(){
   const list=filteredOrders();
