@@ -52,7 +52,14 @@
 
 <!-- KATEGORI + MENU -->
 <div class="max-w-6xl mx-auto px-4 mt-4">
-  <div id="catBar" class="flex gap-2 overflow-auto pb-2"></div>
+  <div class="bg-white rounded-2xl border p-3">
+    <div class="relative">
+      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">🔍</span>
+      <input id="inpCari" oninput="setSearch(this.value)" type="text" placeholder="Cari makanan / minuman... (cth: ayam, es teh)" class="w-full border rounded-xl pl-9 pr-9 py-2.5 text-sm bg-zinc-50 focus:bg-white focus:outline-none focus:border-blue-500">
+      <button id="btnClearCari" onclick="clearSearch()" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 w-7 h-7 grid place-items-center">×</button>
+    </div>
+  </div>
+  <div id="catBar" class="flex gap-2 overflow-auto pb-2 mt-3"></div>
   <div id="menuGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-2"></div>
 </div>
 
@@ -86,6 +93,7 @@
 <script>
 let tipe='dinein';
 let catActive='Semua';
+let searchKw='';
 let cart=[];
 let lastOrder=null;
 let settings=getSettings();
@@ -106,9 +114,30 @@ function renderCats(){
   const bar=document.getElementById('catBar');
   bar.innerHTML=cats.map(c=> `<button onclick="catActive='${c}';renderCats();renderMenu()" class="px-4 py-1.5 rounded-full border text-sm whitespace-nowrap ${catActive===c?'bg-zinc-900 text-white border-zinc-900':'bg-white'}">${c}</button>`).join('');
 }
+function setSearch(v){
+  searchKw=(v||'').trim().toLowerCase();
+  document.getElementById('btnClearCari').classList.toggle('hidden', !searchKw);
+  renderMenu();
+}
+function clearSearch(){
+  searchKw='';
+  document.getElementById('inpCari').value='';
+  document.getElementById('btnClearCari').classList.add('hidden');
+  renderMenu();
+}
 function renderMenu(){
   const grid=document.getElementById('menuGrid');
-  const filtered = catActive==='Semua' ? menus : menus.filter(m=>m.kategori===catActive);
+  let filtered = catActive==='Semua' ? menus.slice() : menus.filter(m=>m.kategori===catActive);
+  if(searchKw){
+    filtered = filtered.filter(m=>
+      (m.nama||'').toLowerCase().includes(searchKw) ||
+      (m.kategori||'').toLowerCase().includes(searchKw)
+    );
+  }
+  if(!filtered.length){
+    grid.innerHTML='<div class="col-span-full text-sm text-zinc-500 bg-white border rounded-2xl p-6 text-center">Menu tidak ditemukan untuk "'+searchKw+'". Coba kata kunci lain atau ganti kategori.</div>';
+    return;
+  }
   grid.innerHTML = filtered.map(m=> `
     <div class="bg-white rounded-2xl border overflow-hidden flex flex-col ${m.stok==='habis'?'opacity-60':''}">
       <img src="${m.foto}" class="h-20 w-full object-cover">
